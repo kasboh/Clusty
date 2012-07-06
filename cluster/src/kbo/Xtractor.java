@@ -45,30 +45,20 @@ public class Xtractor {
 	Tagger tagger;
 	protected Lemmatiser lemmatiser;
 	WordPairGenerator pairGenerator;
-	protected SentenceList sentenceBase;
-	//	protected SimplePairList pairKeyList;
+	protected SentenceList sentenceBase; // stores all sentences in form of <word, wordPOSind>,<word,wordPOSind>
 	protected PairStats wordpairStatList;
-	//	protected SimpleElementList docKeyList;
-	//	protected SimpleElementList wordKeyList;
-//	protected ArrayList<String> wordIdList;
 	protected ArrayList<String> stopWords;
 	protected HashMap<Integer, String> docIdList; // same as above, hashmap? also Integer type will be better later for memory consumption
 	protected int maxSpan;
 	protected List<PhraseSentenceAdjacencyList> arrayRightPairList, arrayLeftPairList;
-//	protected HashMap<Integer, HashMap<Integer, Short>> phraseDocumentsRelation; // ArrayList<TupleIntShort>
 	protected IntObjectOpenHashMap<IntShortOpenHashMap> phraseDocumentsRelation;
-//	protected HashMap<Integer, HashMap<Integer, Short>> documentPhraseRelation; //
 	protected IntObjectOpenHashMap<IntShortOpenHashMap> documentPhraseRelation;
-//	protected HashMap<Integer, ArrayList<Token>> phraseSentenceRelation;
 	protected IntObjectOpenHashMap<ArrayList<Token>> phraseSentenceRelation;
-	//protected HashMap<Integer, Integer> sentenceDocumentsRelation;
 	protected IntIntOpenHashMap sentenceDocumentsRelation;
 	protected IntObjectOpenHashMap<IntShortOpenHashMap> documentTermRelation;//
-//	protected HashMap<Integer, HashMap<Integer, Short>> termDocumentRelation;//
 	protected IntIntOpenHashMap phraseFrequencyIndex;
 	protected IntIntOpenHashMap termFreqIndexList; 
-	//protected IntCharOpenHashMap termWordIndexList; 
-	protected HashMap<Integer, String> termWordIndexList; // contains string word and its index;
+	protected HashMap<Integer, String> termIndexList; // contains string word and its index;
 	protected HashMap<String, Integer> wordTermIndexList;
 	protected String folder;
 	protected WordPairExpandEng expander;
@@ -85,17 +75,15 @@ public class Xtractor {
 		this.pairGenerator = pairGenerator;
 		this.folder = folder;
 		this.stopWords = stopWords;
-		sentenceBase = new SentenceList(folder+"/sentenceList.list"); // not dragontoolkit
+		sentenceBase = new SentenceList(); // former constructor parameter folder+"/sentenceList.list"
 		parser=new EngDocumentParser();
 		parser.setStopWords(stopWords);
 		(new File(folder)).mkdirs();
-		//		docKeyList=new SimpleElementList(folder+"/dockey.list",true);
-		//		wordKeyList=new SimpleElementList(folder+"/wordkey.list",true);
-//		wordIdList = new ArrayList<String>();
+
 		docIdList = new HashMap<Integer, String>(20000);
-		termWordIndexList = new HashMap<Integer, String>(60000);
+		termIndexList = new HashMap<Integer, String>(60000);
 		wordTermIndexList = new HashMap<String, Integer>(60000);
-		//		pairKeyList=new SimplePairList(folder+"/pairkey.list",true);
+
 		pairKeyListCounter = 0;
 		documentIndexCounter = 0;
 		wordIndexCounter = 0;
@@ -107,11 +95,10 @@ public class Xtractor {
 		phraseDocumentsRelation = new IntObjectOpenHashMap<IntShortOpenHashMap>();
 		documentPhraseRelation = new IntObjectOpenHashMap<IntShortOpenHashMap>(20000);
 		documentTermRelation = new IntObjectOpenHashMap<IntShortOpenHashMap>(20000);
-//		termDocumentRelation = new HashMap<Integer, HashMap<Integer, Short>>();
+
 		phraseFrequencyIndex = new IntIntOpenHashMap();
 		termFreqIndexList = new IntIntOpenHashMap(50000);
-		//		phraseFrequencyIndex = new HashMap<Integer, Integer>();
-		//		termFreqIndexList = new HashMap<Integer, Integer>();
+
 		for(int i=1;i<=maxSpan;i++){
 			// create adjacency list for each span, it will store histogram for word pair and sentences
 			// <pair index> <sentence index> <frequency>
@@ -130,8 +117,8 @@ public class Xtractor {
 		int k = 0;
 		single = false;
 		try {
-			//			curArticle = cr.getNextArticle();
-			curArticle = cr.getNextRandom();
+			curArticle = cr.getNextArticle();
+			//curArticle = cr.getNextRandom();
 			while (curArticle!=null){
 				if (k>=trainset){break;}
 				k++;
@@ -139,17 +126,19 @@ public class Xtractor {
 				//				documentKey = curArticle.getKey();
 				//				documentIndex = docKeyList.add(curArticle.getKey());
 				documentIndex = -1;
-				for(Map.Entry<Integer, String> dId : docIdList.entrySet()){
+				//following part performs check if document was already indexed, not really necessary
+				//as its done in collection reader	
+				/*for(Map.Entry<Integer, String> dId : docIdList.entrySet()){
 					if(dId.getValue().equals(curArticle.getKey())){
 						documentIndex = dId.getKey();
 					}
-				}
+				}*/
 				if (documentIndex == -1){
 					documentIndex = documentIndexCounter;
 					docIdList.put(documentIndex, curArticle.getKey());
 					documentIndexCounter++;
 				}
-				
+
 				curDoc=new Document();
 				curDoc.addParagraph(parser.parseParagraph(curArticle.getTitle())); //array of sentences?
 				curDoc.addParagraph(parser.parseParagraph(curArticle.getAbstract()));
@@ -161,9 +150,10 @@ public class Xtractor {
 						indexSentence(curSent,documentIndex);
 						curSent=curSent.next;
 					}
-					curParagraph=curParagraph.next;
+					curParagraph=curParagraph.next;	
 				}
-				curArticle = cr.getNextRandom();
+				curArticle = cr.getNextArticle();
+				//curArticle = cr.getNextRandom();
 			}
 			closeIndex();
 		}
@@ -274,7 +264,7 @@ public class Xtractor {
 		}
 	}
 	public void extract(double minStrength, double minSpread, double minZScore, double minExpandRatio, String outputFile){
-		expander=new WordPairExpandEng(maxSpan,folder, minExpandRatio, arrayRightPairList, arrayLeftPairList, sentenceBase, phraseSentenceRelation, termWordIndexList);
+		expander=new WordPairExpandEng(maxSpan,folder, minExpandRatio, arrayRightPairList, arrayLeftPairList, sentenceBase, phraseSentenceRelation, termIndexList);
 		pairFilter=new WordPairFilter(folder,maxSpan,minStrength,minSpread,minZScore);
 		extract(expander,minStrength,minSpread,minZScore,outputFile);
 	}
@@ -461,7 +451,8 @@ public class Xtractor {
 			e.printStackTrace();
 		}
 	}*/
-	/** Preprocess a sentence including tagging, lemmatising and indexing. This method can be overrided.
+	/** Preprocess a sentence including tagging, lemmatising and indexing.
+	 * also maintains docTerm, TermFreq, TermIndex lists
 	 * @param sent the sentence for preprocessing
 	 */
 	protected void preprocessSentence(Sentence sent, Integer docKey){
@@ -474,28 +465,36 @@ public class Xtractor {
 		cur=sent.getFirstWord();
 		while(cur!=null){
 			//if(cur.getPOSIndex()==Tagger.POS_NOUN || cur.getPOSIndex()==Tagger.POS_VERB)
-				if(lemmatiser!=null)
-					cur.setLemma(lemmatiser.lemmatize(cur.getContent()));
-				else
-					cur.setLemma(cur.getContent().toLowerCase());
+			if(lemmatiser!=null)
+				cur.setLemma(lemmatiser.lemmatize(cur.getContent()));
+			else
+				cur.setLemma(cur.getContent().toLowerCase());
 			//else
 			//	cur.setLemma(cur.getContent().toLowerCase());
-			
+
 			//do not index stop words
 			//if(stopWords.contains(cur.getContent())){
 			//	cur=cur.next;
 			//	continue;
 			//}
-			
-			if(wordTermIndexList.containsKey(cur.getLemma())){
+			wordIndex = -1;
+			if(termIndexList.containsValue(cur.getLemma())){
+				for(Map.Entry<Integer, String> terms : termIndexList.entrySet()){
+					if(terms.getValue().equalsIgnoreCase(cur.getLemma())){
+						wordIndex = terms.getKey();
+						break;
+					}
+				}
+			}
+			/*if(wordTermIndexList.containsKey(cur.getLemma())){
 				wordIndex = wordTermIndexList.get(cur.getLemma());
 				cur.setIndex(wordIndex);
-			}
+			}*/
 			else {
 				wordIndex = wordIndexCounter;
 				wordIndexCounter++;
 				cur.setIndex(wordIndex);
-				termWordIndexList.put(wordIndex, cur.getLemma());
+				termIndexList.put(wordIndex, cur.getLemma());
 				wordTermIndexList.put(cur.getLemma(), wordIndex);
 			}
 			//
@@ -529,7 +528,7 @@ public class Xtractor {
 				documentsWithTerm.put(docKey, (short) 1);
 				termDocumentRelation.put(wordIndex,documentsWithTerm);
 			}
-			*/
+			 */
 			// termIndexList
 			if(termFreqIndexList.containsKey(wordIndex)){
 				termFreqIndexList.put(wordIndex, termFreqIndexList.get(wordIndex) + 1);
@@ -664,15 +663,13 @@ public class Xtractor {
 				count++;
 		return count + 1;
 	}
-	
+
 	public IntObjectOpenHashMap<IntShortOpenHashMap> getPhraseDocumentsRelation() {
 		return phraseDocumentsRelation;
 	}
-
 	public IntObjectOpenHashMap<IntShortOpenHashMap> getDocumentTermRelation() {
 		return documentTermRelation;
 	}
-
 	public IntIntOpenHashMap getPhraseFrequencyIndex() {
 		return phraseFrequencyIndex;
 	}
@@ -682,7 +679,7 @@ public class Xtractor {
 	public IntIntOpenHashMap getTermFreqIndexList() {
 		return termFreqIndexList;
 	}
-//	public HashMap<Integer, String> getTermWordIndexList() {
-//		return termWordIndexList;
-//	}
+	//	public HashMap<Integer, String> getTermWordIndexList() {
+	//		return termWordIndexList;
+	//	}
 }

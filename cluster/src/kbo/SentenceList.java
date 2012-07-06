@@ -17,11 +17,11 @@ public class SentenceList {
 	private int sentenceNum;
 	private IntObjectOpenHashMap<ArrayList<TupleInt>> sentenceIndex;
 //	private HashMap<Integer, ArrayList<TupleInt>> sentenceIndex;
-	SentenceListWriter sentWriter;
-	public SentenceList(String file){
+	//SentenceListWriter sentWriter;
+	public SentenceList(){
 		sentenceNum=0;
 		sentenceIndex = new IntObjectOpenHashMap<ArrayList<TupleInt>>();
-		sentWriter = new SentenceListWriter(file);
+		//sentWriter = new SentenceListWriter(file);
 	}
 	public int addSentence(Sentence sent){
 		Word cur;

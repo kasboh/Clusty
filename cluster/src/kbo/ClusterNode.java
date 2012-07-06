@@ -324,6 +324,15 @@ public class ClusterNode {
 		});
 //		updateClusterProfile();
 	}
+	// same as above but update not in a separate thread
+	public void appendChildSync(ClusterNode node){
+		ArrayList<String> childArticles = node.getClusterArticles();
+		for(String article : childArticles){
+			clusterArticles.add(article);
+		}
+		childNodes.add(node);
+		updateClusterProfile();
+	}
 	public void appendChild(Article article){
 		createChild(article);
 		//updateClusterProfile();
@@ -343,6 +352,11 @@ public class ClusterNode {
 		});
 //		updateClusterProfile();
 	}
+	/**
+	 * same as appendChild but profile update
+	 * is executed in the same tread
+	 * @param nodes
+	 */
 	public void appendChildSync(ArrayList<ClusterNode> nodes){
 		for(ClusterNode child : nodes){
 			ArrayList<String> childArticles = child.getClusterArticles();
@@ -421,13 +435,13 @@ public class ClusterNode {
 		}
 //		long t3 = System.currentTimeMillis();
 //		System.out.println("Compared similarity in: " + (t3-t2));
-		if(maxSimilarity == Double.MIN_VALUE){ // articel had no body text, only heading, ignore such article
+		if(maxSimilarity == Double.MIN_VALUE){ // Article had no body text, only heading, ignore such article
 			return;
 		}
 		if(maxSimilarity<=minClusterSimilarity){
 			//System.out.print(maxSimilarity);
 			if(bestMatch.getType() == CLUSTERNODE){
-				bestMatch.cluster(article, maxSimilarity); //FIXME parent with one document
+				bestMatch.cluster(article, maxSimilarity); 
 			}
 			else{
 				bestMatch.include(article);
@@ -435,10 +449,10 @@ public class ClusterNode {
 			clusterArticles.add(article.getKey());
 			//mergeClustersKLSSingle(mergeFactor, clusters, freeIndexes,bestMatch);
 		}
-		else if(maxSimilarity<=(minClusterSimilarity*5)){
+		else if(maxSimilarity<=(minClusterSimilarity*10)){
 			//Merge to new node
 			if(bestMatch.getType() == CLUSTERNODE){
-				bestMatch.cluster(article, maxSimilarity); //FIXME parent with one document
+				bestMatch.cluster(article, maxSimilarity); 
 			}
 			else{
 				ClusterNode child = new ClusterNode();
@@ -504,6 +518,7 @@ public class ClusterNode {
 			return false;
 		}
 		if(childNodes.isEmpty()){
+			//non-cluster leaf
 			return false;
 		}
 		else {
@@ -620,8 +635,13 @@ public class ClusterNode {
 			return deleted;
 		}
 		if((minDistance<mergeFactor)&&(minDistance>0)){
-			merge(a, b);
-			childNodes.remove(b);
+			int res = merge(a, b);
+			if(res == 1){
+				childNodes.remove(b);
+			}
+			else if (res == 0){
+				childNodes.remove(a);
+			}
 			deleted = true;
 		}
 		return deleted;
@@ -661,7 +681,7 @@ public class ClusterNode {
 				ptt = gamma * c2.get(p1.getKey());
 			}
 			else {
-				ptt = gamma;
+				ptt = epsilon;
 			}
 			distance += (p1.getValue()-ptt) *(Math.log(p1.getValue()/ptt));
 		}
@@ -670,14 +690,14 @@ public class ClusterNode {
 		}
 		return distance;
 	}
-	private void merge(ClusterNode cl1, ClusterNode cl2){
+	private int merge(ClusterNode cl1, ClusterNode cl2){
 		if(cl1 == null || cl2 == null){
-			return;
+			return -1;
 		}
 		// we also shouldn't merge clusterleaf and clusternode
 		// because cluterleaf has only documents and no childs
 		if (cl1.getType() != cl2.getType()){
-			return;
+			return -1;
 		}
 		// two objects are clusters (leafs)
 		if(cl1.getType() == ClusterNode.CLUSTERLEAF){
@@ -691,14 +711,20 @@ public class ClusterNode {
 			ArrayList<ClusterNode> childToMove = cl2.getChildNodes();
 			if(childToMove.isEmpty()){
 				// we have child node with only one article
-				ArrayList<String> articlesToMove = cl2.getClusterArticles();
-				ArrayList<String> articlesToUpdate = cl1.getClusterArticles();
-				articlesToUpdate.addAll(articlesToMove);
+				cl1.appendChildSync(cl2);
+				//ArrayList<String> articlesToMove = cl2.getClusterArticles();
+				//ArrayList<String> articlesToUpdate = cl1.getClusterArticles();
+				//articlesToUpdate.addAll(articlesToMove);
+			}
+			else if (cl1.getChildNodes().isEmpty()){
+				cl2.appendChildSync(cl1);
+				return 0;
 			}
 			else {
 				cl1.appendChildSync(childToMove);
 			}
 		}
+		return 1;
 	}
 
 	public ArrayList<ClusterNode> getChildNodes() {

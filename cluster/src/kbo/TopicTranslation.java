@@ -55,7 +55,7 @@ public class TopicTranslation {
 		// document threshold: number of terms / / 8
 //		docThreshold = (int) (wordKeyList.size() / computeAvgTermNum(documentTermRelation) / 8.0);
 		//		useDocFrequency = true;
-		int minFrequency=2;
+		int minFrequency=1;
 		emBkgCoefficient=0.5;
 		probThreshold=0.001;//
 		iterationNum = 20;
