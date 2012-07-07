@@ -60,11 +60,12 @@ public class Xtractor {
 	protected IntIntOpenHashMap termFreqIndexList; 
 	protected HashMap<Integer, String> termIndexList; // contains string word and its index;
 	protected HashMap<String, Integer> wordTermIndexList;
+	protected CollocationsList pairKeyList;
 	protected String folder;
 	protected WordPairExpandEng expander;
 	protected WordPairFilter pairFilter;
 	protected ArrayList<WordPairStat> singleArticlePhrases;
-	protected int pairKeyListCounter;
+	//protected int pairKeyListCounter;
 	protected int documentIndexCounter;
 	protected int wordIndexCounter;
 	protected boolean single; // used to tell index to store phrase for single article
@@ -84,7 +85,7 @@ public class Xtractor {
 		termIndexList = new HashMap<Integer, String>(60000);
 		wordTermIndexList = new HashMap<String, Integer>(60000);
 
-		pairKeyListCounter = 0;
+		//pairKeyListCounter = 0;
 		documentIndexCounter = 0;
 		wordIndexCounter = 0;
 		wordpairStatList=new PairStats(folder+"/pairstat.list",maxSpan,true);
@@ -98,6 +99,7 @@ public class Xtractor {
 
 		phraseFrequencyIndex = new IntIntOpenHashMap();
 		termFreqIndexList = new IntIntOpenHashMap(50000);
+		pairKeyList = new CollocationsList();
 
 		for(int i=1;i<=maxSpan;i++){
 			// create adjacency list for each span, it will store histogram for word pair and sentences
@@ -236,9 +238,9 @@ public class Xtractor {
 				return true;
 			for(i=0;i<num;i++){
 				curPair=pairGenerator.getWordPairs(i);
-				//				curPair.setIndex(pairKeyList.add(curPair.getFirstWord(),curPair.getSecondWord()));
-				curPair.setIndex(pairKeyListCounter);
-				pairKeyListCounter++;
+				curPair.setIndex(pairKeyList.add(curPair.getFirstWord(),curPair.getSecondWord()));	
+				//curPair.setIndex(pairKeyListCounter);
+				//pairKeyListCounter++;
 				if(!single) {
 					wordpairStatList.add(curPair); 
 				}
@@ -358,9 +360,8 @@ public class Xtractor {
 			bw.write(list.size()+"\n");
 			for(i=0;i<list.size();i++){
 				phrase=(Token)list.get(i);
-				bw.write(phrase.getValue());
-				bw.write('\t'+phrase.getFrequency());
-				bw.write('\n');
+				bw.write(phrase.getValue() + " = " + phrase.getFrequency());
+				bw.write("\n");
 				bw.flush();
 			}
 			bw.close();
@@ -478,18 +479,19 @@ public class Xtractor {
 			//	continue;
 			//}
 			wordIndex = -1;
-			if(termIndexList.containsValue(cur.getLemma())){
+			/*if(termIndexList.containsValue(cur.getLemma())){
 				for(Map.Entry<Integer, String> terms : termIndexList.entrySet()){
 					if(terms.getValue().equalsIgnoreCase(cur.getLemma())){
 						wordIndex = terms.getKey();
+						cur.setIndex(wordIndex);
 						break;
 					}
 				}
-			}
-			/*if(wordTermIndexList.containsKey(cur.getLemma())){
+			}*/
+			if(wordTermIndexList.containsKey(cur.getLemma())){
 				wordIndex = wordTermIndexList.get(cur.getLemma());
 				cur.setIndex(wordIndex);
-			}*/
+			}
 			else {
 				wordIndex = wordIndexCounter;
 				wordIndexCounter++;
