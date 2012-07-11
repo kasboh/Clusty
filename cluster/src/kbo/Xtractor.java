@@ -119,8 +119,8 @@ public class Xtractor {
 		int k = 0;
 		single = false;
 		try {
-			curArticle = cr.getNextArticle();
-			//curArticle = cr.getNextRandom();
+			//curArticle = cr.getNextArticle();
+			curArticle = cr.getNextRandom();
 			while (curArticle!=null){
 				if (k>=trainset){break;}
 				k++;
@@ -154,8 +154,8 @@ public class Xtractor {
 					}
 					curParagraph=curParagraph.next;	
 				}
-				curArticle = cr.getNextArticle();
-				//curArticle = cr.getNextRandom();
+				//curArticle = cr.getNextArticle();
+				curArticle = cr.getNextRandom();
 			}
 			closeIndex();
 		}
@@ -680,6 +680,12 @@ public class Xtractor {
 	}
 	public IntIntOpenHashMap getTermFreqIndexList() {
 		return termFreqIndexList;
+	}
+	public IndexList getPhrases(){
+		return expander.getPhraseIndex();
+	}
+	public HashMap<Integer, String> getTermIndexList() {
+		return termIndexList;
 	}
 	//	public HashMap<Integer, String> getTermWordIndexList() {
 	//		return termWordIndexList;

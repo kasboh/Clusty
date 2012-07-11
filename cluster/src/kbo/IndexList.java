@@ -1,6 +1,7 @@
 package kbo;
 
 import java.util.HashMap;
+import java.util.Map.Entry;
 
 /** IndexList is a list for storing 
  * string value of term and its index value
@@ -27,5 +28,16 @@ public class IndexList {
 			indexList.put(content, index);
 			return index;
 		}
+	}
+	public int getSize(){
+		return indexList.size();
+	}
+	public String getPhrase(int id){
+		for(Entry<String, Integer> k : indexList.entrySet()){
+			if(k.getValue().equals(id)){
+				return k.getKey();
+			}
+		}
+		return "";
 	}
 }

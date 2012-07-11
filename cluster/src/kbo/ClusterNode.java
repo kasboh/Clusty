@@ -31,11 +31,13 @@ public class ClusterNode {
 	private ArrayList<String> clusterArticles;
 	private HashMap<Integer, Double> vecSmooth;
 
+	static int debug=0;
 	static private long time;
 	static public boolean initialized;
 	static public String workingDir;
 	static final int CLUSTERLEAF = 0;
 	static final int CLUSTERNODE = 1;
+	static final int DOCUMENTLEAF = 2;
 	static public int clusterCounter;
 	static public Map<String, Long> docAge;
 	static public double minClusterSimilarity;
@@ -231,8 +233,8 @@ public class ClusterNode {
 		vecDF1.clear(); 
 		vecDF2.clear();
 		//test
-		vecDF2 = new IntDoubleOpenHashMap();
-		vecDF1 = new IntDoubleOpenHashMap();
+		//vecDF2 = new IntDoubleOpenHashMap();
+		//vecDF1 = new IntDoubleOpenHashMap();
 		// end test
 		//Normalize vecSmooth
 		double vecSum = 0.0;
@@ -241,6 +243,9 @@ public class ClusterNode {
 		}
 		for (Map.Entry<Integer, Double> entry : vecSmooth.entrySet()){
 
+			//double value2 = entry.getValue()/vecSum;
+			//double value3 = vecSmooth.get(entry.getKey())/vecSum;
+			//double debugTEst = value2+value3;
 			vecSmooth.put(entry.getKey(), vecSmooth.get(entry.getKey())/vecSum );
 
 		}
@@ -248,7 +253,7 @@ public class ClusterNode {
 	public void updateClusterProfile(){
 		calculateDF2(); 
 		calculateDF1();
-		semanticSmoothing(0.6);
+		semanticSmoothing(0.6);//0.6
 	}
 	protected void CreateProfile (Article article){ 
 		clusterArticles.add(article.getKey());
@@ -260,13 +265,17 @@ public class ClusterNode {
 				updateClusterProfile();
 			}
 		}.start();
-		*/
+		 */
 		threadExecutor.execute(new Runnable(){
 			public void run(){
 				updateClusterProfile();
 			}
 		});
-//		updateClusterProfile();
+		//		updateClusterProfile();
+	}
+	protected void CreateProfileNoThread (Article article){ 
+		clusterArticles.add(article.getKey());
+		updateClusterProfile();
 	}
 	/**
 	 *  called by parent node to determine similarity of article with child
@@ -300,10 +309,13 @@ public class ClusterNode {
 					// log of 0 is not defined so skip it
 					continue;
 				}
-				int value = articleTermsValues[term];
+				double value = articleTermsValues[term];
 				intersection++;
 				//				logLikelihood += (value*Math.log(vecSmooth.get(term.getKey())));
-				logLikelihood = logLikelihood + (value*(Math.log(vecSmooth.get(articleTermsKeys[term]))));
+				double smoothValue = vecSmooth.get(articleTermsKeys[term]);
+				double likelihood = value*Math.log(smoothValue);
+				
+				logLikelihood = logLikelihood + likelihood;
 			}
 		}
 		if(logLikelihood == 0.0 && (intersection == 0)){
@@ -322,7 +334,7 @@ public class ClusterNode {
 				updateClusterProfile();
 			}
 		});
-//		updateClusterProfile();
+		//		updateClusterProfile();
 	}
 	// same as above but update not in a separate thread
 	public void appendChildSync(ClusterNode node){
@@ -350,7 +362,7 @@ public class ClusterNode {
 				updateClusterProfile();
 			}
 		});
-//		updateClusterProfile();
+		//		updateClusterProfile();
 	}
 	/**
 	 * same as appendChild but profile update
@@ -363,7 +375,7 @@ public class ClusterNode {
 			clusterArticles.addAll(childArticles);
 			childNodes.add(child);
 		}
-	updateClusterProfile();
+		updateClusterProfile();
 	}
 	/**
 	 * if similarity of Article with child nodes is too low
@@ -384,13 +396,14 @@ public class ClusterNode {
 	 * @param similarity
 	 */
 	public void cluster(Article article, double similarity){
-		if((clusterArticles.size() == 1) && (childNodes.isEmpty()) && (similarity <= minClusterSimilarity)){ 
+		if((clusterArticles.size() == 1) && (similarity >= minClusterSimilarity)){ 
 			//middle && condition is not really required
 			// If node has only one article and high similarity, it means that documents are very similar, share the same topic
 			// and belong to one cluster
 			childNodes = null;
 			type = CLUSTERLEAF;
-			include(article);
+			debug++;
+			include(article, similarity);
 		}
 		else if(clusterArticles.size() == 1){
 			// if Node has only one article then it shouldn't create one child
@@ -417,9 +430,9 @@ public class ClusterNode {
 	}
 	public void cluster(Article article) {
 		double similarity = 0.0;
-		double maxSimilarity = Double.MAX_VALUE;
+		double maxSimilarity = Double.MIN_VALUE;
 		ClusterNode bestMatch = null;
-//		long t2 = System.currentTimeMillis();
+		//		long t2 = System.currentTimeMillis();
 		for (ClusterNode cl : childNodes){
 			similarity = cl.compareSimilarity(article);
 			if(similarity == Double.MIN_VALUE){
@@ -428,44 +441,70 @@ public class ClusterNode {
 				maxSimilarity = similarity;
 				break;
 			}
-			if (similarity < maxSimilarity){
+			if(similarity == Double.MAX_VALUE){
+				continue;
+			}
+			if (similarity > maxSimilarity){
 				maxSimilarity = similarity;
 				bestMatch = cl;
 			}
 		}
-//		long t3 = System.currentTimeMillis();
-//		System.out.println("Compared similarity in: " + (t3-t2));
+
+		//		long t3 = System.currentTimeMillis();
+		//		System.out.println("Compared similarity in: " + (t3-t2));
 		if(maxSimilarity == Double.MIN_VALUE){ // Article had no body text, only heading, ignore such article
 			return;
 		}
-		if(maxSimilarity<=minClusterSimilarity){
+		if(maxSimilarity >= minClusterSimilarity){
 			//System.out.print(maxSimilarity);
 			if(bestMatch.getType() == CLUSTERNODE){
 				bestMatch.cluster(article, maxSimilarity); 
 			}
 			else{
-				bestMatch.include(article);
+				bestMatch.include(article, similarity);
 			}
 			clusterArticles.add(article.getKey());
 			//mergeClustersKLSSingle(mergeFactor, clusters, freeIndexes,bestMatch);
 		}
-		else if(maxSimilarity<=(minClusterSimilarity*10)){
+		else if(maxSimilarity>=(minClusterSimilarity*0.9)){		
 			//Merge to new node
 			if(bestMatch.getType() == CLUSTERNODE){
 				bestMatch.cluster(article, maxSimilarity); 
 			}
 			else{
+				createChild(article);
+				/*
 				ClusterNode child = new ClusterNode();
 				childNodes.add(child);
 				child.appendChild(article);
 				child.appendChild(bestMatch);
 				childNodes.remove(bestMatch);
+				*/
 			}
 			clusterArticles.add(article.getKey());
 		}
 		else {
-			//Add new child
-			createChild(article);
+			//before the new child the root node reclusters the node one more time
+			/*if(clusterID == 0){
+				// this is done as test
+				// to have less node in first level
+				if(bestMatch.getType() == CLUSTERNODE && (maxSimilarity >= minClusterSimilarity*0.01)){
+					bestMatch.cluster(article, maxSimilarity); 
+				}
+				else{
+					//createChild(article);
+					ClusterNode child = new ClusterNode();
+					childNodes.add(child);
+					child.appendChild(article);
+					child.appendChild(bestMatch);
+					childNodes.remove(bestMatch);
+				}
+				//clusterArticles.add(article.getKey());
+			}*/
+			//else{
+				//Add new child
+				createChild(article);
+			//}
 		}
 		if(clusterID != 0){ // root node doesn't need to have cluster vecSmooth
 			threadExecutor.execute(new Runnable(){
@@ -473,7 +512,7 @@ public class ClusterNode {
 					updateClusterProfile();
 				}
 			});
-//			updateClusterProfile();
+			//			updateClusterProfile();
 		}
 	}
 	/**
@@ -482,16 +521,17 @@ public class ClusterNode {
 	 * "real" cluster with articles belonging together
 	 * @param article
 	 */
-	public void include(Article article){
+	public void include(Article article, double similarity){
+		double debug = similarity;
 		clusterArticles.add(article.getKey());
 		threadExecutor.execute(new Runnable(){
 			public void run(){
 				updateClusterProfile();
 			}
 		});
-//		updateClusterProfile();
+		//		updateClusterProfile();
 		//l = System.currentTimeMillis();
-		System.err.println("Added "+ article.getKey() + " to cluster "+ clusterID);
+		System.err.println("Added "+ article.getKey() + " to cluster "+ clusterID + " # " + debug);
 	}
 	//void updateTime();
 	protected double fadingFunction(long time){
@@ -527,7 +567,21 @@ public class ClusterNode {
 			}
 		}
 		// mergeClustersKLS should be in else and here return false
-		return mergeClustersKLS(mergeFactor);
+		boolean result =  mergeClustersKLS(mergeFactor);
+		/* often after merging
+		 * we get situations where two existing child nodes merged into one
+		 * leading to the situation where node has one child
+		 * child node also has only one child and so 
+		 * until at the bottom last child has few clusters
+		 */
+		if(childNodes.size()==1 && type == CLUSTERNODE){
+			ClusterNode child = childNodes.get(0);
+			if(child.getType() == ClusterNode.CLUSTERNODE){
+				childNodes.remove(0);
+				childNodes = child.getChildNodes();
+			}
+		}
+		return result;
 	}
 	//public ArrayList<String> getClusterArticles();
 	public int getType() {
@@ -575,7 +629,7 @@ public class ClusterNode {
 			e.printStackTrace();
 		}
 	}
-	private HashMap<Integer, Double> getVecSmooth() {
+	public HashMap<Integer, Double> getVecSmooth() {
 		return vecSmooth;
 	}
 	/**
@@ -709,6 +763,9 @@ public class ClusterNode {
 		// two nodes are nodes
 		else {
 			ArrayList<ClusterNode> childToMove = cl2.getChildNodes();
+			if(cl1.getChildNodes().isEmpty() && cl2.getChildNodes().isEmpty()){
+				return -1;
+			}
 			if(childToMove.isEmpty()){
 				// we have child node with only one article
 				cl1.appendChildSync(cl2);
@@ -729,5 +786,127 @@ public class ClusterNode {
 
 	public ArrayList<ClusterNode> getChildNodes() {
 		return childNodes;
+	}
+
+	public String toString(){
+		if(type == ClusterNode.CLUSTERNODE){
+			return Integer.toString(clusterID);
+		}
+		else {
+			StringBuilder sb = new StringBuilder();
+			for(String ar : clusterArticles){
+				sb.append(ar);
+				sb.append(" : ");
+			}
+			return sb.toString();
+		}
+	}
+	public void clusterKLD(Article article, double similarity){
+		if((clusterArticles.size() == 1) && (similarity >= minClusterSimilarity)){ 
+			//middle && condition is not really required
+			// If node has only one article and high similarity, it means that documents are very similar, share the same topic
+			// and belong to one cluster
+			childNodes = null;
+			type = CLUSTERLEAF;
+			debug++;
+			include(article, similarity);
+		}
+		else if(clusterArticles.size() == 1){
+			// if Node has only one article then it shouldn't create one child
+			// but instead create two children: one with existing document and one with document
+			// 1. create child with current article 
+			for(String art : clusterArticles){
+				ClusterNode child = new ClusterNode();
+				childNodes.add(child);
+				child.getClusterArticles().add(art);
+				child.updateClusterProfile();
+			}
+			// 2. create second child
+			createChild(article);
+			// update own cluster centroid
+			threadExecutor.execute(new Runnable(){
+				public void run(){
+					updateClusterProfile();
+				}
+			});
+		}
+		else{
+			cluster(article);
+		}
+	}
+	public void clusterKLD(Article article, SelfNode candidate) {
+		double similarity = 0.0;
+		double maxSimilarity = Double.MAX_VALUE;
+		ClusterNode bestMatch = null;
+
+		for (ClusterNode cl : childNodes){
+			similarity = compareKLsymetric(cl.getVecSmooth(), candidate.getVecSmooth());
+			if(Math.abs(similarity)<maxSimilarity){
+				maxSimilarity = Math.abs(similarity);
+				bestMatch = cl;
+			}
+		}
+		if(maxSimilarity == Double.MAX_VALUE){
+			return;
+		}
+		
+		if(maxSimilarity <= minClusterSimilarity){
+			//System.out.print(maxSimilarity);
+			if(bestMatch.getType() == CLUSTERNODE){
+				bestMatch.clusterKLD(article, maxSimilarity); 
+			}
+			else{
+				bestMatch.include(article, similarity);
+			}
+			clusterArticles.add(article.getKey());
+		}
+		else if(maxSimilarity<=(minClusterSimilarity+2)){		
+			//Merge to new node
+			if(bestMatch.getType() == CLUSTERNODE){
+				bestMatch.clusterKLD(article, maxSimilarity); 
+			}
+			else{
+				createChild(article);
+				/*
+				ClusterNode child = new ClusterNode();
+				childNodes.add(child);
+				child.appendChild(article);
+				child.appendChild(bestMatch);
+				childNodes.remove(bestMatch);
+				*/
+			}
+			clusterArticles.add(article.getKey());
+		}
+		else {
+			//before the new child the root node reclusters the node one more time
+			/*if(clusterID == 0){
+				// this is done as test
+				// to have less node in first level
+				if(bestMatch.getType() == CLUSTERNODE && (maxSimilarity >= minClusterSimilarity*0.01)){
+					bestMatch.cluster(article, maxSimilarity); 
+				}
+				else{
+					//createChild(article);
+					ClusterNode child = new ClusterNode();
+					childNodes.add(child);
+					child.appendChild(article);
+					child.appendChild(bestMatch);
+					childNodes.remove(bestMatch);
+				}
+				//clusterArticles.add(article.getKey());
+			}*/
+			//else{
+				//Add new child
+				createChild(article);
+			//}
+		}
+		if(clusterID != 0){ // root node doesn't need to have cluster vecSmooth
+			threadExecutor.execute(new Runnable(){
+				public void run(){
+					updateClusterProfile();
+				}
+			});
+			//			updateClusterProfile();
+		}
 	}
 }

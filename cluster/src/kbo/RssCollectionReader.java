@@ -62,6 +62,26 @@ public class RssCollectionReader implements CollectionReader {
 		//SELECT id, title,content FROM feeds
 		return cur;
 	}
+	@Override
+	public Article getArticleByKey(String key) {
+		Article cur = new BasicArticle();
+		try {
+			ResultSet rs = stat.executeQuery("SELECT _id, title,content FROM feeds WHERE _id = " + key);
+			while (rs.next()) {
+				String rssTitle = rs.getString("title");
+				String rssContent = rs.getString("content");
+				Integer rssIndex = rs.getInt("_id");
+				cur.setKey(rssIndex.toString());
+				cur.setTitle(rssTitle);
+				cur.setBody(rssContent);
+			}
+			rs.close();
+		}
+		catch (SQLException e) {
+			e.printStackTrace();
+		}
+		return cur;
+	}
 	public Article getNextRandom(){
 		Article cur = new BasicArticle();
 		if(shuffleCount >= shuffle.length)
@@ -116,11 +136,7 @@ public class RssCollectionReader implements CollectionReader {
 		// TODO Auto-generated method stub
 		
 	}
-	@Override
-	public Article getArticleByKey(String key) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+
 	@Override
 	public boolean supportArticleKeyRetrieval() {
 		// TODO Auto-generated method stub

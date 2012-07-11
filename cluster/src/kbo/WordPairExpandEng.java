@@ -31,7 +31,7 @@ public class WordPairExpandEng {
     protected IntObjectOpenHashMap<ArrayList<Token>> phraseSentenceRelation;
     private IndexList phraseIndex;
 
-    /*public WordPairExpandEng(int maxSpan, String indexFolder, double threshold, HashMap<Integer, String> termWordIndexList) {
+	/*public WordPairExpandEng(int maxSpan, String indexFolder, double threshold, HashMap<Integer, String> termWordIndexList) {
         this.maxSpan = maxSpan;
         this.threshold = threshold;
         this.indexFolder = indexFolder;
@@ -339,4 +339,8 @@ public class WordPairExpandEng {
         else
             return false;
     }
+    
+    public IndexList getPhraseIndex() {
+		return phraseIndex;
+	}
 }
